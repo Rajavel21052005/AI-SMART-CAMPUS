@@ -40,4 +40,4 @@ RUN mkdir -p logs ai_models \
 EXPOSE 5000
 
 # Default command
-CMD ["python", "run.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "run:app"]
