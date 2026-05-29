@@ -1,0 +1,192 @@
+{% extends "shared/base.html" %}
+{% block title %}Train AI Model{% endblock %}
+{% block page_title %}AI Model Training{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('admin.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('admin.students') }}" class="nav-link sidebar-link"><i class="bi bi-people me-2"></i>Students</a></li>
+<li><a href="{{ url_for('admin.train_model') }}" class="nav-link sidebar-link active"><i class="bi bi-cpu me-2"></i>Train AI Model</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <div class="col-lg-6">
+    <!-- Face Recognition Training -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-scan me-2 text-primary"></i>Face Recognition Model</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Regenerates face embeddings for all active students using
+          <strong>FaceNet512 + RetinaFace</strong>.
+          Run this after adding new students or updating photos.
+        </p>
+        <div class="alert alert-warning small">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          Training may take 1–5 minutes depending on the number of students.
+          The camera will be unavailable during training.
+        </div>
+
+        <div id="faceTrainResult" class="mb-3" style="display:none;"></div>
+        <input type="hidden" id="csrfToken" value="{{ csrf_token() }}">
+
+        <button class="btn btn-primary w-100" id="trainFaceBtn" onclick="trainFaceModel()">
+          <i class="bi bi-cpu me-2"></i>Start Face Model Training
+        </button>
+      </div>
+    </div>
+
+    <!-- Risk Prediction Training -->
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-graph-up me-2 text-danger"></i>Risk Prediction ML Model</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Trains <strong>Random Forest, XGBoost, and Logistic Regression</strong>.
+          Auto-selects the best model by F1-score and saves it.
+        </p>
+        <div class="row g-2 mb-3">
+          <div class="col-4 text-center">
+            <div class="border rounded p-2">
+              <div class="fw-bold text-success small">Random Forest</div>
+              <div class="x-small text-muted">200 trees</div>
+            </div>
+          </div>
+          <div class="col-4 text-center">
+            <div class="border rounded p-2">
+              <div class="fw-bold text-warning small">XGBoost</div>
+              <div class="x-small text-muted">Gradient boost</div>
+            </div>
+          </div>
+          <div class="col-4 text-center">
+            <div class="border rounded p-2">
+              <div class="fw-bold text-info small">Logistic Reg.</div>
+              <div class="x-small text-muted">Baseline</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-medium">Training data source</label>
+          <select class="form-select form-select-sm" id="dataSource">
+            <option value="db">Live database records</option>
+            <option value="synthetic">Synthetic data (600 samples)</option>
+          </select>
+        </div>
+
+        <div id="riskTrainResult" class="mb-3" style="display:none;"></div>
+
+        <a href="#" class="btn btn-danger w-100" id="trainRiskBtn" onclick="trainRiskModel(event)">
+          <i class="bi bi-graph-up me-2"></i>Train Risk Prediction Model
+        </a>
+        <div class="form-text mt-2 text-center">
+          Or run from terminal: <code>python training/train_risk_model.py --synthetic</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model status panel -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2 text-info"></i>Current Model Status</h6></div>
+      <div class="card-body">
+        <table class="table table-sm">
+          <tr>
+            <td class="text-muted small">Face Model</td>
+            <td><span class="badge bg-success">FaceNet512 + RetinaFace</span></td>
+          </tr>
+          <tr>
+            <td class="text-muted small">Threshold</td>
+            <td><code>0.60 cosine similarity</code></td>
+          </tr>
+          <tr>
+            <td class="text-muted small">Risk Model</td>
+            <td id="riskModelStatus"><span class="badge bg-secondary">Not trained yet</span></td>
+          </tr>
+          <tr>
+            <td class="text-muted small">Liveness</td>
+            <td><span class="badge bg-success">EAR blink + Head-pose</span></td>
+          </tr>
+          <tr>
+            <td class="text-muted small">Anti-Spoof</td>
+            <td><span class="badge bg-success">LBP Texture + Optical Flow</span></td>
+          </tr>
+        </table>
+
+        <hr>
+        <div class="small text-muted fw-semibold mb-2">Features Used for Risk Prediction</div>
+        <ul class="list-unstyled small text-muted">
+          <li><i class="bi bi-check-circle text-success me-2"></i>Attendance percentage</li>
+          <li><i class="bi bi-check-circle text-success me-2"></i>Average internal marks</li>
+          <li><i class="bi bi-check-circle text-success me-2"></i>Assignment completion %</li>
+          <li><i class="bi bi-check-circle text-success me-2"></i>Previous semester GPA</li>
+          <li><i class="bi bi-check-circle text-success me-2"></i>Lab performance score</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function trainFaceModel() {
+  const btn = document.getElementById('trainFaceBtn');
+  const res = document.getElementById('faceTrainResult');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Training…';
+
+  fetch('/face/train', { method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf() }
+  })
+  .then(r => r.json())
+  .then(data => {
+    res.style.display = 'block';
+    if (data.status === 'success') {
+      res.innerHTML = `<div class="alert alert-success small">
+        ✅ Training complete! <strong>${data.count}</strong> encodings generated.
+        ${data.failed} failed · ${data.skipped} skipped.
+        <div class="text-muted x-small mt-1">${data.timestamp}</div>
+      </div>`;
+    } else {
+      res.innerHTML = `<div class="alert alert-danger small">❌ ${data.message}</div>`;
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-cpu me-2"></i>Retrain Face Model';
+  })
+  .catch(e => {
+    res.style.display = 'block';
+    res.innerHTML = `<div class="alert alert-danger small">Network error: ${e.message}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-cpu me-2"></i>Start Face Model Training';
+  });
+}
+
+function trainRiskModel(e) {
+  e.preventDefault();
+  const btn = document.getElementById('trainRiskBtn');
+  const res = document.getElementById('riskTrainResult');
+  btn.style.pointerEvents = 'none';
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Training all 3 models…';
+  res.style.display = 'block';
+  res.innerHTML = `<div class="alert alert-info small">
+    <strong>Training in progress…</strong><br>
+    This runs in the background via the terminal command below.
+    Refresh this page after ~30 seconds to see updated status.
+  </div>`;
+  setTimeout(() => {
+    btn.style.pointerEvents = '';
+    btn.innerHTML = '<i class="bi bi-graph-up me-2"></i>Train Risk Prediction Model';
+  }, 3000);
+}
+
+function getCsrf() {
+  return document.getElementById('csrfToken').value;
+}
+</script>
+{% endblock %}

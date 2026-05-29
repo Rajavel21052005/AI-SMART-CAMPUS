@@ -1,0 +1,234 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Student Dashboard{% endblock %}
+{% block page_title %}My Dashboard{% endblock %}
+
+{% block sidebar_links %}
+<li class="nav-item">
+  <a href="{{ url_for('student.dashboard') }}" class="nav-link sidebar-link active">
+    <i class="bi bi-speedometer2 me-2"></i>Dashboard
+  </a>
+</li>
+<li class="nav-item">
+  <a href="{{ url_for('student.attendance') }}" class="nav-link sidebar-link">
+    <i class="bi bi-calendar-check me-2"></i>My Attendance
+  </a>
+</li>
+<li class="nav-item">
+  <a href="{{ url_for('student.marks') }}" class="nav-link sidebar-link">
+    <i class="bi bi-bar-chart me-2"></i>My Marks
+  </a>
+</li>
+<li class="nav-item">
+  <a href="{{ url_for('student.timetable') }}" class="nav-link sidebar-link">
+    <i class="bi bi-clock me-2"></i>Timetable
+  </a>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- ── Greeting ──────────────────────────────────────────── -->
+  <div class="col-12">
+    <div class="welcome-banner d-flex align-items-center justify-content-between p-4 rounded-3">
+      <div>
+        <h4 class="fw-bold mb-1">Hello, {{ student.name.split()[0] }} 👋</h4>
+        <p class="mb-0 text-muted">{{ student.reg_number }} · Semester {{ student.semester }} · {{ student.department.name }}</p>
+      </div>
+      {% if risk %}
+      <span class="badge fs-6 risk-badge-{{ risk.risk_level.value|lower }}">
+        <i class="bi bi-{{ 'check-circle' if risk.risk_level.value == 'Safe' else ('exclamation-triangle' if risk.risk_level.value == 'Moderate' else 'x-circle') }}-fill me-1"></i>
+        {{ risk.risk_level.value }} Risk
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── KPI Cards ─────────────────────────────────────────── -->
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card h-100 text-center p-3">
+      <div class="kpi-icon mb-2"><i class="bi bi-calendar-check-fill text-success fs-2"></i></div>
+      <div class="kpi-value fw-bold fs-2 {{ 'text-danger' if attend_pct < 75 else 'text-success' }}">{{ attend_pct }}%</div>
+      <div class="kpi-label text-muted small">Overall Attendance</div>
+      {% if attend_pct < 75 %}
+      <span class="badge bg-danger-subtle text-danger mt-1 small">Below 75% ⚠</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card h-100 text-center p-3">
+      <div class="kpi-icon mb-2"><i class="bi bi-star-fill text-warning fs-2"></i></div>
+      {% set avg_gpa = (marks | map(attribute='gpa') | list | sum / marks|length) if marks else 0 %}
+      <div class="kpi-value fw-bold fs-2">{{ '%.1f'|format(avg_gpa) }}</div>
+      <div class="kpi-label text-muted small">Current GPA</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card h-100 text-center p-3">
+      <div class="kpi-icon mb-2"><i class="bi bi-clipboard-check-fill text-info fs-2"></i></div>
+      <div class="kpi-value fw-bold fs-2">{{ pending_assignments|length }}</div>
+      <div class="kpi-label text-muted small">Pending Assignments</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card h-100 text-center p-3">
+      <div class="kpi-icon mb-2"><i class="bi bi-bell-fill text-primary fs-2"></i></div>
+      <div class="kpi-value fw-bold fs-2">{{ notifications|length }}</div>
+      <div class="kpi-label text-muted small">Unread Alerts</div>
+    </div>
+  </div>
+
+  <!-- ── Subject-wise Attendance Chart ─────────────────────── -->
+  <div class="col-md-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Subject-wise Attendance</h6>
+      </div>
+      <div class="card-body">
+        <canvas id="subjectAttendanceChart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Today's Timetable ──────────────────────────────────── -->
+  <div class="col-md-5">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-clock-fill me-2 text-warning"></i>Today's Schedule</h6>
+      </div>
+      <div class="card-body p-0">
+        {% if timetable_today %}
+        <div class="list-group list-group-flush">
+          {% for slot in timetable_today %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-semibold small">{{ slot.subject.name }}</div>
+              <div class="text-muted x-small">{{ slot.start_time.strftime('%H:%M') }} – {{ slot.end_time.strftime('%H:%M') }}</div>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-primary-subtle text-primary">Period {{ slot.period_number }}</span>
+              {% if slot.room %}<div class="text-muted x-small">{{ slot.room }}</div>{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>No classes scheduled today
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Subject Attendance Table ──────────────────────────── -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-table me-2 text-success"></i>Attendance Details</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>Subject</th>
+                <th class="text-center">Present</th>
+                <th class="text-center">Total</th>
+                <th class="text-center">Percentage</th>
+                <th class="text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in subj_stats %}
+              <tr>
+                <td>
+                  <div class="fw-semibold small">{{ s.subject.name }}</div>
+                  <div class="text-muted x-small">{{ s.subject.code }}</div>
+                </td>
+                <td class="text-center">{{ s.present }}</td>
+                <td class="text-center">{{ s.total }}</td>
+                <td class="text-center">
+                  <div class="progress" style="height:8px;">
+                    <div class="progress-bar {{ 'bg-danger' if s.pct < 75 else 'bg-success' }}"
+                         style="width:{{ s.pct }}%"></div>
+                  </div>
+                  <small class="fw-semibold {{ 'text-danger' if s.pct < 75 else '' }}">{{ s.pct }}%</small>
+                </td>
+                <td class="text-center">
+                  <span class="badge {{ 'bg-danger' if s.pct < 75 else 'bg-success' }}">
+                    {{ 'Defaulter' if s.pct < 75 else 'OK' }}
+                  </span>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center text-muted py-3">No attendance data yet</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Pending Assignments ────────────────────────────────── -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-clipboard2-fill me-2 text-danger"></i>Pending Assignments</h6>
+      </div>
+      <div class="card-body p-0">
+        {% if pending_assignments %}
+        <div class="list-group list-group-flush">
+          {% for a in pending_assignments %}
+          <div class="list-group-item">
+            <div class="fw-semibold small">{{ a.title }}</div>
+            <div class="text-muted x-small">Due: {{ a.due_date.strftime('%d %b %Y') }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-3 text-center text-muted small">
+          <i class="bi bi-check-all fs-2 text-success d-block"></i>All caught up!
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Subject-wise attendance bar chart
+const subjectLabels = {{ subj_stats | map(attribute='subject') | map(attribute='code') | list | tojson }};
+const subjectPcts   = {{ subj_stats | map(attribute='pct') | list | tojson }};
+const bgColors = subjectPcts.map(p => p < 75 ? '#DC2626' : '#16A34A');
+
+new Chart(document.getElementById('subjectAttendanceChart'), {
+  type: 'bar',
+  data: {
+    labels: subjectLabels,
+    datasets: [{
+      label: 'Attendance %',
+      data: subjectPcts,
+      backgroundColor: bgColors,
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min: 0, max: 100,
+           ticks: { callback: v => v + '%' } },
+    }
+  }
+});
+</script>
+{% endblock %}

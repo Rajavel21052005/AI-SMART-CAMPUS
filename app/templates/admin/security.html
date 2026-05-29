@@ -1,0 +1,87 @@
+{% extends "shared/base.html" %}
+{% block title %}Security Logs{% endblock %}
+{% block page_title %}Campus Security Logs{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('admin.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('face.security_monitor') }}" class="nav-link sidebar-link"><i class="bi bi-camera-video me-2"></i>Live Monitor</a></li>
+<li><a href="{{ url_for('admin.security') }}" class="nav-link sidebar-link active"><i class="bi bi-shield-lock me-2"></i>Security Logs</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-semibold"><i class="bi bi-shield-lock-fill me-2 text-danger"></i>Security Event Log</h6>
+    <a href="{{ url_for('face.security_monitor') }}" class="btn btn-danger btn-sm">
+      <i class="bi bi-camera-video me-1"></i>Live Monitor
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr><th>#</th><th>Event Type</th><th>Location</th><th>Description</th>
+              <th>Time</th><th class="text-center">Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for log in logs.items %}
+          <tr>
+            <td class="small text-muted">{{ log.log_id }}</td>
+            <td>
+              <span class="badge {{ 'bg-danger' if log.event_type.value == 'unknown_face' else 'bg-warning text-dark' }}">
+                {{ log.event_type.value | replace('_', ' ') | title }}
+              </span>
+            </td>
+            <td class="small">{{ log.location or '—' }}</td>
+            <td class="small text-muted">{{ log.description[:60] if log.description else '—' }}</td>
+            <td class="small">{{ log.timestamp.strftime('%d %b %H:%M') }}</td>
+            <td class="text-center">
+              <span class="badge {{ 'bg-success' if log.resolved else 'bg-danger' }}">
+                {{ 'Resolved' if log.resolved else 'Open' }}
+              </span>
+            </td>
+            <td>
+              {% if not log.resolved %}
+              <button class="btn btn-xs btn-outline-success"
+                      onclick="resolve({{ log.log_id }}, this)">Resolve</button>
+              {% endif %}
+              {% if log.image_path %}
+              <a href="/{{ log.image_path }}" target="_blank" class="btn btn-xs btn-outline-secondary ms-1">
+                <i class="bi bi-image"></i>
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No security events logged yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if logs.pages > 1 %}
+  <div class="card-footer">
+    <nav><ul class="pagination pagination-sm mb-0">
+      {% for p in logs.iter_pages() %}
+        {% if p %}
+        <li class="page-item {{ 'active' if p == logs.page }}">
+          <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+        </li>
+        {% endif %}
+      {% endfor %}
+    </ul></nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function resolve(id, btn) {
+  fetch(`/admin/security/resolve/${id}`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content }
+  }).then(() => location.reload());
+}
+</script>
+{% endblock %}

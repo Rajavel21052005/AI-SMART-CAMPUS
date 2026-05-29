@@ -1,0 +1,172 @@
+{% extends "shared/base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block page_title %}Admin Control Panel{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('admin.dashboard') }}" class="nav-link sidebar-link active"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('admin.students') }}" class="nav-link sidebar-link"><i class="bi bi-people me-2"></i>Students</a></li>
+<li><a href="{{ url_for('admin.departments') }}" class="nav-link sidebar-link"><i class="bi bi-building me-2"></i>Departments</a></li>
+<li><a href="{{ url_for('admin.train_model') }}" class="nav-link sidebar-link"><i class="bi bi-cpu me-2"></i>Train AI Model</a></li>
+<li><a href="{{ url_for('admin.security') }}" class="nav-link sidebar-link"><i class="bi bi-shield-lock me-2"></i>Security Logs</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Welcome -->
+  <div class="col-12">
+    <div class="welcome-banner p-4 rounded-3 d-flex justify-content-between align-items-center">
+      <div>
+        <h4 class="fw-bold mb-1">Admin Control Panel</h4>
+        <p class="mb-0 text-muted">System-wide monitoring and management</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.train_model') }}" class="btn btn-warning btn-sm">
+          <i class="bi bi-cpu me-1"></i>Train AI
+        </a>
+        <a href="{{ url_for('admin.add_student') }}" class="btn btn-primary btn-sm">
+          <i class="bi bi-person-plus me-1"></i>Add Student
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3 border-primary">
+      <i class="bi bi-people-fill fs-2 text-primary mb-2"></i>
+      <div class="fw-bold fs-2">{{ stats.total_students }}</div>
+      <div class="text-muted small">Active Students</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3 border-success">
+      <i class="bi bi-person-badge-fill fs-2 text-success mb-2"></i>
+      <div class="fw-bold fs-2">{{ stats.total_faculty }}</div>
+      <div class="text-muted small">Faculty Members</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3 border-warning">
+      <i class="bi bi-book-fill fs-2 text-warning mb-2"></i>
+      <div class="fw-bold fs-2">{{ stats.total_subjects }}</div>
+      <div class="text-muted small">Subjects</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3 border-danger">
+      <i class="bi bi-shield-exclamation fs-2 text-danger mb-2"></i>
+      <div class="fw-bold fs-2">{{ stats.security_alerts }}</div>
+      <div class="text-muted small">Unresolved Alerts</div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-lightning-fill me-2 text-warning"></i>Quick Actions</h6></div>
+      <div class="card-body d-grid gap-2">
+        <a href="{{ url_for('admin.add_student') }}" class="btn btn-outline-primary">
+          <i class="bi bi-person-plus me-2"></i>Add New Student
+        </a>
+        <a href="{{ url_for('admin.train_model') }}" class="btn btn-outline-warning">
+          <i class="bi bi-cpu me-2"></i>Retrain Face Model
+        </a>
+        <a href="{{ url_for('admin.departments') }}" class="btn btn-outline-success">
+          <i class="bi bi-building me-2"></i>Manage Departments
+        </a>
+        <a href="{{ url_for('admin.security') }}" class="btn btn-outline-danger">
+          <i class="bi bi-camera-video me-2"></i>Security Monitor
+        </a>
+        <a href="/api/v1/risk/all" class="btn btn-outline-secondary">
+          <i class="bi bi-graph-up me-2"></i>Risk Predictions JSON
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Security Alerts -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-shield-lock-fill me-2 text-danger"></i>Recent Security Events</h6>
+        <a href="{{ url_for('admin.security') }}" class="btn btn-xs btn-outline-danger">View All</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_security %}
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0">
+            <thead class="table-dark"><tr><th>Event</th><th>Location</th><th>Time</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+            {% for log in recent_security %}
+            <tr>
+              <td>
+                <span class="badge {{ 'bg-danger' if log.event_type.value == 'unknown_face' else 'bg-warning text-dark' }}">
+                  {{ log.event_type.value | replace('_', ' ') | title }}
+                </span>
+              </td>
+              <td class="small">{{ log.location or '—' }}</td>
+              <td class="small text-muted">{{ log.timestamp.strftime('%d %b %H:%M') }}</td>
+              <td>
+                <span class="badge {{ 'bg-success' if log.resolved else 'bg-danger' }}">
+                  {{ 'Resolved' if log.resolved else 'Open' }}
+                </span>
+              </td>
+              <td>
+                {% if not log.resolved %}
+                <button class="btn btn-xs btn-outline-success resolve-btn" data-id="{{ log.log_id }}">
+                  Resolve
+                </button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-shield-check fs-2 text-success d-block mb-2"></i>No recent security events
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Dept stats doughnut -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-pie-chart me-2 text-info"></i>Department Split</h6></div>
+      <div class="card-body d-flex justify-content-center">
+        <canvas id="deptChart" width="200" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Resolve security alert via API
+document.querySelectorAll('.resolve-btn').forEach(btn => {
+  btn.addEventListener('click', function () {
+    const id = this.dataset.id;
+    fetch(`/admin/security/resolve/${id}`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content }
+    }).then(() => location.reload());
+  });
+});
+
+// Dept chart (placeholder — replace with real API data)
+new Chart(document.getElementById('deptChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['CSE', 'ECE', 'MECH', 'CIVIL'],
+    datasets: [{ data: [35, 25, 20, 20], backgroundColor: ['#2563EB','#16A34A','#D97706','#DC2626'] }]
+  },
+  options: { responsive: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+});
+</script>
+{% endblock %}

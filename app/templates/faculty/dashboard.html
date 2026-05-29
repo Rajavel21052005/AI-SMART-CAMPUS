@@ -1,0 +1,157 @@
+{% extends "shared/base.html" %}
+{% block title %}Faculty Dashboard{% endblock %}
+{% block page_title %}Faculty Dashboard{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('faculty.dashboard') }}" class="nav-link sidebar-link active"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('faculty.defaulters') }}" class="nav-link sidebar-link"><i class="bi bi-exclamation-triangle me-2"></i>Defaulters</a></li>
+{% for subj in subjects %}
+<li><a href="{{ url_for('faculty.live_attendance', subject_id=subj.subject_id) }}" class="nav-link sidebar-link">
+  <i class="bi bi-camera-video me-2"></i>{{ subj.code }}
+</a></li>
+{% endfor %}
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Welcome banner -->
+  <div class="col-12">
+    <div class="welcome-banner p-4 rounded-3 d-flex justify-content-between align-items-center">
+      <div>
+        <h4 class="fw-bold mb-1">Welcome, {{ faculty.name }} 👋</h4>
+        <p class="mb-0 text-muted">{{ faculty.employee_id }} · {{ faculty.department.name }} · {{ faculty.designation }}</p>
+      </div>
+      <div class="text-end">
+        <div class="fw-bold fs-4 text-primary">{{ subjects|length }}</div>
+        <div class="text-muted small">Subjects</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-people-fill fs-2 text-primary mb-2"></i>
+      <div class="fw-bold fs-2">{{ today_stats | sum(attribute='total') }}</div>
+      <div class="text-muted small">Total Students Today</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-person-check-fill fs-2 text-success mb-2"></i>
+      <div class="fw-bold fs-2">{{ today_stats | sum(attribute='present') }}</div>
+      <div class="text-muted small">Present Today</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-exclamation-circle-fill fs-2 text-danger mb-2"></i>
+      <div class="fw-bold fs-2">{{ high_risk|length }}</div>
+      <div class="text-muted small">High Risk Students</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-book-fill fs-2 text-warning mb-2"></i>
+      <div class="fw-bold fs-2">{{ subjects|length }}</div>
+      <div class="text-muted small">Subjects Assigned</div>
+    </div>
+  </div>
+
+  <!-- Today's attendance per subject -->
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-camera-video-fill me-2 text-primary"></i>Today's Attendance Summary</h6>
+        <span class="badge bg-secondary">{{ today_stats | map(attribute='total') | sum }} total slots</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-dark"><tr><th>Subject</th><th class="text-center">Present</th><th class="text-center">Total</th><th class="text-center">%</th><th>Action</th></tr></thead>
+          <tbody>
+          {% for s in today_stats %}
+          <tr>
+            <td><div class="fw-semibold small">{{ s.subject.name }}</div><div class="text-muted x-small">{{ s.subject.code }}</div></td>
+            <td class="text-center">{{ s.present }}</td>
+            <td class="text-center">{{ s.total }}</td>
+            <td class="text-center">
+              {% set pct = (s.present / s.total * 100) | round(1) if s.total > 0 else 0 %}
+              <div class="progress" style="height:8px"><div class="progress-bar {{ 'bg-danger' if pct < 60 else 'bg-success' }}" style="width:{{ pct }}%"></div></div>
+              <small>{{ pct }}%</small>
+            </td>
+            <td>
+              <a href="{{ url_for('faculty.live_attendance', subject_id=s.subject.subject_id) }}" class="btn btn-xs btn-outline-primary">
+                <i class="bi bi-play-circle"></i> Live
+              </a>
+              <a href="{{ url_for('faculty.export_attendance', subject_id=s.subject.subject_id) }}" class="btn btn-xs btn-outline-success ms-1">
+                <i class="bi bi-file-earmark-excel"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-3">No subjects assigned yet</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- High risk students -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-shield-exclamation me-2 text-danger"></i>High Risk Students</h6>
+      </div>
+      <div class="card-body p-0">
+        {% if high_risk %}
+        <div class="list-group list-group-flush">
+          {% for p in high_risk %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-semibold small">{{ p.student.name }}</div>
+              <div class="text-muted x-small">{{ p.student.reg_number }} · Attend: {{ p.attend_pct }}% · Marks: {{ p.avg_marks }}</div>
+            </div>
+            <span class="badge bg-danger">HIGH</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>No high-risk students
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance donut chart -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-pie-chart-fill me-2 text-info"></i>Attendance Overview</h6></div>
+      <div class="card-body d-flex justify-content-center">
+        <canvas id="attendDonut" width="220" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+fetch('/api/v1/analytics/attendance-summary')
+  .then(r => r.json())
+  .then(data => {
+    new Chart(document.getElementById('attendDonut'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(data),
+        datasets: [{ data: Object.values(data), backgroundColor: ['#16A34A','#D97706','#DC2626'], borderWidth: 2 }]
+      },
+      options: { responsive: false, plugins: { legend: { position: 'bottom' } } }
+    });
+  });
+</script>
+{% endblock %}

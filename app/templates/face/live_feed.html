@@ -1,0 +1,192 @@
+{% extends "shared/base.html" %}
+{% block title %}Live Attendance — {{ subject.name }}{% endblock %}
+{% block page_title %}Live Face Recognition — {{ subject.name }}{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('faculty.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('face.live_view', subject_id=subject.subject_id) }}" class="nav-link sidebar-link active"><i class="bi bi-camera-video-fill me-2"></i>Live Camera</a></li>
+<li><a href="{{ url_for('faculty.defaulters') }}" class="nav-link sidebar-link"><i class="bi bi-exclamation-triangle me-2"></i>Defaulters</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Camera feed -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold">
+          <i class="bi bi-camera-video-fill me-2 text-danger"></i>
+          Live Feed — {{ subject.name }} ({{ subject.code }})
+        </h6>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-danger blink-badge">● LIVE</span>
+          <button class="btn btn-sm btn-outline-secondary" id="toggleStream">
+            <i class="bi bi-pause-fill"></i> Pause
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0 position-relative bg-black">
+        <img id="cameraFeed"
+             src="{{ url_for('face.video_stream', subject_id=subject.subject_id) }}"
+             class="w-100 d-block"
+             style="max-height:480px; min-height: 200; object-fit:contain;"
+             alt="Camera feed">
+        <!-- Overlay legend -->
+        <!-- <div class="position-absolute bottom-0 start-0 p-2 d-flex gap-2">
+          <span class="badge" style="background:rgba(0,200,50,0.8);">■ Known</span>
+          <span class="badge" style="background:rgba(220,0,0,0.8);">■ Unknown</span>
+          <span class="badge" style="background:rgba(200,200,0,0.8);">■ Verifying</span>
+        </div> -->
+      </div>
+    </div>
+
+    <!-- Liveness status -->
+    <div class="card mt-3">
+      <div class="card-body py-2">
+        <div class="d-flex align-items-center gap-3">
+          <i class="bi bi-shield-check-fill text-success fs-4"></i>
+          <div>
+            <div class="fw-semibold small">Anti-Spoofing Active</div>
+            <div class="text-muted x-small">Liveness detection · Texture analysis · Motion tracking</div>
+          </div>
+          <div class="ms-auto">
+            <span class="badge bg-success">Protected</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="col-lg-4">
+
+    <!-- Subject info -->
+    <div class="card mb-3">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2"></i>Session Info</h6></div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted small">Subject</td><td class="fw-semibold small">{{ subject.name }}</td></tr>
+          <tr><td class="text-muted small">Code</td><td class="small">{{ subject.code }}</td></tr>
+          <tr><td class="text-muted small">Faculty</td><td class="small">{{ subject.faculty.name if subject.faculty else '—' }}</td></tr>
+          <tr><td class="text-muted small">Semester</td><td class="small">{{ subject.semester }}</td></tr>
+          <tr><td class="text-muted small">Date</td><td class="small" id="liveClock">—</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Live marked list -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-check-circle-fill me-2 text-success"></i>Marked Present</h6>
+        <span class="badge bg-success" id="markedCount">0</span>
+      </div>
+      <div class="card-body p-0">
+        <div id="markedList" style="max-height:320px; overflow-y:auto;">
+          <div class="text-center text-muted py-4 small" id="noMarked">
+            <i class="bi bi-hourglass-split fs-3 d-block mb-2"></i>Waiting for recognition…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="card mt-3">
+      <div class="card-body d-grid gap-2">
+        <a href="{{ url_for('faculty.export_attendance', subject_id=subject.subject_id) }}"
+           class="btn btn-outline-success btn-sm">
+          <i class="bi bi-file-earmark-excel me-1"></i>Export Attendance (Excel)
+        </a>
+        <a href="{{ url_for('faculty.live_attendance', subject_id=subject.subject_id) }}"
+           class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-table me-1"></i>View Full Attendance Table
+        </a>
+        <button class="btn btn-outline-danger btn-sm" onclick="stopSession()">
+          <i class="bi bi-stop-circle me-1"></i>End Session
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.blink-badge { animation: blink 1.2s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.marked-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--bs-border-color); animation: slideIn .3s ease; }
+@keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
+</style>
+<script>
+// ── Live clock ─────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('liveClock').textContent =
+    new Date().toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Stream pause/resume ────────────────────────────────────
+let streamPaused = false;
+const feedEl     = document.getElementById('cameraFeed');
+const streamUrl  = feedEl.src;
+
+document.getElementById('toggleStream').addEventListener('click', function () {
+  if (streamPaused) {
+    feedEl.src  = streamUrl;
+    this.innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
+  } else {
+    feedEl.src  = '';
+    this.innerHTML = '<i class="bi bi-play-fill"></i> Resume';
+  }
+  streamPaused = !streamPaused;
+});
+
+// ── Poll attendance API every 5 s and update the marked list ─
+let knownMarked = new Set();
+
+function pollAttendance() {
+  fetch('/api/v1/attendance/today?subject_id={{ subject.subject_id }}')
+    .then(r => r.json())
+    .then(records => {
+      records.forEach(rec => {
+        if (rec.status !== 'Absent' && !knownMarked.has(rec.student_id)) {
+          knownMarked.add(rec.student_id);
+          addMarkedEntry(rec);
+        }
+      });
+      document.getElementById('markedCount').textContent = knownMarked.size;
+      if (knownMarked.size > 0) {
+        document.getElementById('noMarked').style.display = 'none';
+      }
+    })
+    .catch(console.error);
+}
+
+function addMarkedEntry(rec) {
+  const list = document.getElementById('markedList');
+  const el   = document.createElement('div');
+  el.className = 'marked-item';
+  const color  = rec.status === 'Present' ? 'success' : 'warning';
+  el.innerHTML = `
+    <i class="bi bi-person-check-fill text-${color} fs-5"></i>
+    <div class="flex-grow-1">
+      <div class="fw-semibold small">${rec.student_id}</div>
+      <div class="text-muted x-small">${rec.time_in || ''}</div>
+    </div>
+    <span class="badge bg-${color}">${rec.status}</span>`;
+  list.prepend(el);
+}
+
+setInterval(pollAttendance, 5000);
+pollAttendance();
+
+function stopSession() {
+  if (confirm('End this attendance session?')) {
+    feedEl.src = '';
+    window.location = '{{ url_for("faculty.dashboard") }}';
+  }
+}
+</script>
+{% endblock %}

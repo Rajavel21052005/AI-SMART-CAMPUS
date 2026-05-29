@@ -1,0 +1,115 @@
+{% extends "shared/base.html" %}
+{% block title %}Attendance — {{ subject.name }}{% endblock %}
+{% block page_title %}Attendance — {{ subject.name }}{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('faculty.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('faculty.defaulters') }}" class="nav-link sidebar-link"><i class="bi bi-exclamation-triangle me-2"></i>Defaulters</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h5 class="fw-bold mb-0">{{ subject.name }} — Today's Attendance</h5>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('face.live_view', subject_id=subject.subject_id) }}" class="btn btn-danger btn-sm">
+      <i class="bi bi-camera-video me-1"></i>Live Camera
+    </a>
+    <a href="{{ url_for('faculty.export_attendance', subject_id=subject.subject_id) }}" class="btn btn-success btn-sm">
+      <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+    </a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  {% set present_count = records | selectattr('status.value', 'equalto', 'Present') | list | length %}
+  {% set late_count    = records | selectattr('status.value', 'equalto', 'Late')    | list | length %}
+  {% set absent_count  = students | length - records | length %}
+  <div class="col-4">
+    <div class="card text-center p-3 border-success">
+      <div class="fw-bold fs-3 text-success">{{ present_count }}</div>
+      <div class="text-muted small">Present</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card text-center p-3 border-warning">
+      <div class="fw-bold fs-3 text-warning">{{ late_count }}</div>
+      <div class="text-muted small">Late</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card text-center p-3 border-danger">
+      <div class="fw-bold fs-3 text-danger">{{ absent_count }}</div>
+      <div class="text-muted small">Absent</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th><th>Reg Number</th><th>Name</th>
+            <th class="text-center">Time In</th>
+            <th class="text-center">Status</th>
+            <th class="text-center">Confidence</th>
+            <th class="text-center">Override</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for student in students %}
+            {% set rec = records | selectattr('student_id', 'equalto', student.student_id) | first | default(none) %}
+          <tr>
+            <td class="text-muted small">{{ loop.index }}</td>
+            <td><code class="small">{{ student.reg_number }}</code></td>
+            <td class="fw-semibold small">{{ student.name }}</td>
+            <td class="text-center small">
+              {{ rec.time_in.strftime('%H:%M:%S') if rec and rec.time_in else '—' }}
+            </td>
+            <td class="text-center">
+              {% if rec %}
+                <span class="badge {{ 'bg-success' if rec.status.value == 'Present' else ('bg-warning text-dark' if rec.status.value == 'Late' else 'bg-danger') }}">
+                  {{ rec.status.value }}
+                </span>
+              {% else %}
+                <span class="badge bg-danger">Absent</span>
+              {% endif %}
+            </td>
+            <td class="text-center small">
+              {{ '%.0f%%'|format(rec.confidence_score * 100) if rec and rec.confidence_score else '—' }}
+            </td>
+            <td class="text-center">
+              {% if rec %}
+                    <select class="form-select form-select-sm" style="width:100px;display:inline-block;"
+                      onchange="overrideStatus('{{ rec.attend_id }}', this.value)">
+                <option value="Present"  {{ 'selected' if rec.status.value == 'Present' }}>Present</option>
+                <option value="Late"     {{ 'selected' if rec.status.value == 'Late' }}>Late</option>
+                <option value="Absent"   {{ 'selected' if rec.status.value == 'Absent' }}>Absent</option>
+              </select>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function overrideStatus(attendId, newStatus) {
+  fetch('/faculty/attendance/manual', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',
+               'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content },
+    body: JSON.stringify({ attend_id: attendId, status: newStatus })
+  })
+  .then(r => r.json())
+  .then(() => console.log('Status updated'))
+  .catch(console.error);
+}
+</script>
+{% endblock %}

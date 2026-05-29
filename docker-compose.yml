@@ -1,0 +1,49 @@
+# ============================================================
+# docker-compose.yml — Smart Campus AI System
+# Usage: docker-compose up --build
+# ============================================================
+version: '3.9'
+
+services:
+
+  # ── MySQL Database ─────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: smart_campus_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE:      ${DB_NAME}
+      MYSQL_USER:          ${DB_USER}
+      MYSQL_PASSWORD:      ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+
+  # ── Flask App ──────────────────────────────────────────────
+  web:
+    build: .
+    container_name: smart_campus_web
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file: .env
+    environment:
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app/static/images:/app/app/static/images
+      - ./logs:/app/logs
+      - ./ai_models:/app/ai_models
+    command: >
+      sh -c "flask init-db && python run.py"
+
+volumes:
+  mysql_data:

@@ -1,0 +1,57 @@
+{% extends "shared/base.html" %}
+{% block title %}Defaulter List{% endblock %}
+{% block page_title %}Attendance Defaulters{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('faculty.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('faculty.defaulters') }}" class="nav-link sidebar-link active"><i class="bi bi-exclamation-triangle me-2"></i>Defaulters</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-exclamation-triangle-fill me-2 text-danger"></i>
+      Students Below {{ threshold }}% Attendance
+    </h6>
+    <span class="badge bg-danger fs-6">{{ defaulters|length }} defaulters</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr><th>Reg Number</th><th>Name</th><th>Subject</th>
+              <th class="text-center">Attendance %</th><th>Gap to Threshold</th></tr>
+        </thead>
+        <tbody>
+          {% for d in defaulters %}
+          <tr>
+            <td><code class="small">{{ d.student.reg_number }}</code></td>
+            <td class="fw-semibold small">{{ d.student.name }}</td>
+            <td class="small">{{ d.subject.name }} ({{ d.subject.code }})</td>
+            <td class="text-center">
+              <div class="progress" style="height:8px;width:80px;margin:0 auto 3px;">
+                <div class="progress-bar bg-danger" style="width:{{ d.pct }}%"></div>
+              </div>
+              <span class="fw-bold text-danger small">{{ d.pct }}%</span>
+            </td>
+            <td>
+              <span class="badge bg-danger-subtle text-danger">
+                Needs {{ (d.threshold - d.pct)|round(1) }}% more
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center py-5 text-muted">
+              <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
+              No defaulters! All students are above {{ threshold }}%.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

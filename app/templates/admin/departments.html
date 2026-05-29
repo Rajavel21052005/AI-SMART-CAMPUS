@@ -1,0 +1,61 @@
+{% extends "shared/base.html" %}
+{% block title %}Departments{% endblock %}
+{% block page_title %}Department Management{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('admin.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('admin.students') }}" class="nav-link sidebar-link"><i class="bi bi-people me-2"></i>Students</a></li>
+<li><a href="{{ url_for('admin.departments') }}" class="nav-link sidebar-link active"><i class="bi bi-building me-2"></i>Departments</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-plus-circle me-2 text-primary"></i>Add Department</h6></div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" id="csrfToken" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label fw-medium">Department Name</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. Computer Science Engineering" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Code</label>
+            <input type="text" name="code" class="form-control" placeholder="e.g. CSE" maxlength="10" required style="text-transform:uppercase;">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">HOD Name</label>
+            <input type="text" name="hod_name" class="form-control" placeholder="Head of Department">
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-plus me-1"></i>Add Department
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-building me-2 text-success"></i>All Departments</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-dark"><tr><th>Code</th><th>Name</th><th>HOD</th><th class="text-center">Students</th></tr></thead>
+          <tbody>
+            {% for d in departments %}
+            <tr>
+              <td><span class="badge bg-primary">{{ d.code }}</span></td>
+              <td class="fw-semibold small">{{ d.name }}</td>
+              <td class="small text-muted">{{ d.hod_name or '—' }}</td>
+              <td class="text-center small">{{ d.students.count() }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">No departments yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

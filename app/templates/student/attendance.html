@@ -1,0 +1,68 @@
+{% extends "shared/base.html" %}
+{% block title %}My Attendance{% endblock %}
+{% block page_title %}Attendance History{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('student.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('student.attendance') }}" class="nav-link sidebar-link active"><i class="bi bi-calendar-check me-2"></i>My Attendance</a></li>
+<li><a href="{{ url_for('student.marks') }}" class="nav-link sidebar-link"><i class="bi bi-bar-chart me-2"></i>My Marks</a></li>
+<li><a href="{{ url_for('student.timetable') }}" class="nav-link sidebar-link"><i class="bi bi-clock me-2"></i>Timetable</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-semibold"><i class="bi bi-calendar-check-fill me-2 text-primary"></i>Full Attendance Record</h6>
+    <div>
+      <select class="form-select form-select-sm d-inline-block" style="width:160px;" id="statusFilter" onchange="filterTable()">
+        <option value="">All Status</option>
+        <option value="Present">Present</option>
+        <option value="Late">Late</option>
+        <option value="Absent">Absent</option>
+      </select>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="attendTable">
+        <thead class="table-dark">
+          <tr><th>Date</th><th>Subject</th><th>Time In</th><th class="text-center">Status</th><th class="text-center">Confidence</th></tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr data-status="{{ r.status.value }}">
+            <td class="small">{{ r.date.strftime('%d %b %Y') }}</td>
+            <td>
+              <div class="fw-semibold small">{{ r.subject.name }}</div>
+              <div class="text-muted x-small">{{ r.subject.code }}</div>
+            </td>
+            <td class="small">{{ r.time_in.strftime('%H:%M') if r.time_in else '—' }}</td>
+            <td class="text-center">
+              <span class="badge {{ 'bg-success' if r.status.value == 'Present' else ('bg-warning text-dark' if r.status.value == 'Late' else 'bg-danger') }}">
+                {{ r.status.value }}
+              </span>
+            </td>
+            <td class="text-center small">
+              {{ '%.0f%%'|format(r.confidence_score * 100) if r.confidence_score else ('Manual' if r.is_manual else '—') }}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">No attendance records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterTable() {
+  const val = document.getElementById('statusFilter').value;
+  document.querySelectorAll('#attendTable tbody tr[data-status]').forEach(row => {
+    row.style.display = (!val || row.dataset.status === val) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

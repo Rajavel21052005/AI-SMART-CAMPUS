@@ -1,0 +1,194 @@
+{% extends "shared/base.html" %}
+{% block title %}Register Face — {{ student.name }}{% endblock %}
+{% block page_title %}Face Registration{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('admin.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('admin.students') }}" class="nav-link sidebar-link"><i class="bi bi-people me-2"></i>Students</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <div class="card mb-3">
+      <div class="card-body d-flex align-items-center gap-3">
+        <i class="bi bi-person-bounding-box fs-1 text-primary"></i>
+        <div>
+          <h5 class="fw-bold mb-0">Register Face — {{ student.name }}</h5>
+          <div class="text-muted small">{{ student.reg_number }} · {{ student.department.name }} · Sem {{ student.semester }}</div>
+        </div>
+        {% if student.photo_path %}
+        <span class="badge bg-success ms-auto"><i class="bi bi-check-circle me-1"></i>Face registered</span>
+        {% else %}
+        <span class="badge bg-warning text-dark ms-auto"><i class="bi bi-exclamation-circle me-1"></i>No face yet</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" id="regTabs">
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#webcamTab">
+          <i class="bi bi-camera-fill me-1"></i>Capture from Webcam
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#uploadTab">
+          <i class="bi bi-upload me-1"></i>Upload Photo
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+
+      <!-- ── Webcam capture tab ──────────────────────────── -->
+      <div class="tab-pane fade show active" id="webcamTab">
+        <div class="card">
+          <div class="card-body text-center">
+            <div class="position-relative d-inline-block mb-3">
+              <video id="webcamVideo" width="480" height="360"
+                     class="rounded border" autoplay muted
+                     style="background:#000;display:none;"></video>
+              <canvas id="snapCanvas" width="480" height="360"
+                      class="rounded border" style="display:none;"></canvas>
+              <div id="camPlaceholder" class="rounded border d-flex align-items-center
+                   justify-content-center bg-dark text-white"
+                   style="width:480px;height:360px;">
+                <div class="text-center">
+                  <i class="bi bi-camera fs-1 d-block mb-2"></i>
+                  Click "Start Camera" to begin
+                </div>
+              </div>
+              <!-- Face guide overlay -->
+              <div id="faceGuide" style="display:none;position:absolute;top:50%;left:50%;
+                   transform:translate(-50%,-50%);width:200px;height:240px;
+                   border:3px dashed rgba(0,255,0,0.6);border-radius:50%;pointer-events:none;"></div>
+            </div>
+
+            <div class="d-flex justify-content-center gap-3 mb-3">
+              <button class="btn btn-primary" id="startCamBtn" onclick="startCamera()">
+                <i class="bi bi-camera me-1"></i>Start Camera
+              </button>
+              <button class="btn btn-success" id="snapBtn" onclick="takeSnapshot()" disabled>
+                <i class="bi bi-camera-fill me-1"></i>Take Snapshot
+              </button>
+              <button class="btn btn-warning" id="retakeBtn" onclick="retake()" style="display:none">
+                <i class="bi bi-arrow-repeat me-1"></i>Retake
+              </button>
+            </div>
+
+            <p class="text-muted small">
+              <i class="bi bi-info-circle me-1"></i>
+              Position face inside the oval guide. Ensure good lighting and look directly at camera.
+            </p>
+
+            <form method="POST" id="snapForm" action="{{ url_for('face.register_face', student_id=student.student_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="snapshot_data" id="snapshotData">
+              <button type="submit" class="btn btn-primary btn-lg px-5" id="submitSnapBtn" disabled>
+                <i class="bi bi-check-circle me-1"></i>Register This Photo
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── File upload tab ─────────────────────────────── -->
+      <div class="tab-pane fade" id="uploadTab">
+        <div class="card">
+          <div class="card-body">
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('face.register_face', student_id=student.student_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Upload Student Photo</label>
+                <input type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png" required
+                       onchange="previewUpload(this)">
+                <div class="form-text">JPG or PNG · Max 5MB · Clear front-facing photo</div>
+              </div>
+
+              <div id="uploadPreview" class="text-center mb-3" style="display:none">
+                <img id="previewImg" src="" alt="Preview"
+                     class="rounded border" style="max-height:300px; max-width:100%;">
+              </div>
+
+              <div class="alert alert-info small">
+                <i class="bi bi-lightbulb me-2"></i>
+                <strong>Tips for best results:</strong> Use a recent clear photo,
+                face should occupy at least 40% of the frame,
+                avoid sunglasses, hats, or heavy shadows.
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-person-plus me-1"></i>Upload & Register Face
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stream = null;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width:480, height:360 } });
+    const video = document.getElementById('webcamVideo');
+    video.srcObject = stream;
+    document.getElementById('camPlaceholder').style.display = 'none';
+    video.style.display = 'block';
+    document.getElementById('faceGuide').style.display = 'block';
+    document.getElementById('startCamBtn').disabled = true;
+    document.getElementById('snapBtn').disabled     = false;
+  } catch (e) {
+    alert('Camera access denied. Please allow camera permissions and try again.');
+  }
+}
+
+function takeSnapshot() {
+  const video  = document.getElementById('webcamVideo');
+  const canvas = document.getElementById('snapCanvas');
+  const ctx    = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, 480, 360);
+
+  video.style.display  = 'none';
+  canvas.style.display = 'block';
+  document.getElementById('faceGuide').style.display = 'none';
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  document.getElementById('snapshotData').value = dataUrl;
+  document.getElementById('snapBtn').disabled    = true;
+  document.getElementById('retakeBtn').style.display = 'inline-block';
+  document.getElementById('submitSnapBtn').disabled  = false;
+
+  // Stop camera stream
+  if (stream) stream.getTracks().forEach(t => t.stop());
+}
+
+function retake() {
+  document.getElementById('snapCanvas').style.display = 'none';
+  document.getElementById('snapshotData').value   = '';
+  document.getElementById('submitSnapBtn').disabled = true;
+  document.getElementById('retakeBtn').style.display = 'none';
+  document.getElementById('snapBtn').disabled = false;
+  startCamera();
+}
+
+function previewUpload(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('previewImg').src      = e.target.result;
+      document.getElementById('uploadPreview').style.display = 'block';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "shared/base.html" %}
+{% block title %}Timetable{% endblock %}
+{% block page_title %}My Timetable{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('student.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('student.attendance') }}" class="nav-link sidebar-link"><i class="bi bi-calendar-check me-2"></i>My Attendance</a></li>
+<li><a href="{{ url_for('student.marks') }}" class="nav-link sidebar-link"><i class="bi bi-bar-chart me-2"></i>My Marks</a></li>
+<li><a href="{{ url_for('student.timetable') }}" class="nav-link sidebar-link active"><i class="bi bi-clock me-2"></i>Timetable</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-calendar-week-fill me-2 text-primary"></i>
+      Weekly Timetable — Semester {{ student.semester }}
+    </h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-bordered mb-0 text-center">
+        <thead class="table-dark">
+          <tr>
+            <th style="width:80px;">Period</th>
+            {% for day in days %}
+            <th>{{ day.value }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for period in range(1, 9) %}
+          <tr>
+            <td class="fw-semibold small">P{{ period }}</td>
+            {% for day in days %}
+              {% set slots = timetable[day.value] | selectattr('period_number', 'equalto', period) | list %}
+              {% if slots %}
+                {% set slot = slots[0] %}
+                <td style="background:var(--bs-primary-bg-subtle);">
+                  <div class="fw-semibold small">{{ slot.subject.code }}</div>
+                  <div class="text-muted x-small">{{ slot.start_time.strftime('%H:%M') }}</div>
+                  {% if slot.room %}<div class="x-small text-muted">{{ slot.room }}</div>{% endif %}
+                </td>
+              {% else %}
+                <td class="text-muted x-small">—</td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

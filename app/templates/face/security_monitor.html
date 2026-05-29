@@ -1,0 +1,64 @@
+{% extends "shared/base.html" %}
+{% block title %}Security Monitor{% endblock %}
+{% block page_title %}Campus Security Monitor{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('admin.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('face.security_monitor') }}" class="nav-link sidebar-link active"><i class="bi bi-shield-lock me-2"></i>Security Monitor</a></li>
+<li><a href="{{ url_for('admin.security') }}" class="nav-link sidebar-link"><i class="bi bi-list-ul me-2"></i>Security Logs</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-camera-video-fill me-2 text-danger"></i>Campus Security Feed</h6>
+        <span class="badge bg-danger blink-badge">● LIVE</span>
+      </div>
+      <div class="card-body p-0 bg-black">
+        <img src="{{ url_for('face.security_stream') }}"
+             class="w-100 d-block" style="max-height:480px;object-fit:contain;" alt="Security feed">
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0 fw-semibold text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Recent Alerts</h6></div>
+      <div class="card-body p-0">
+        <div id="alertList" style="max-height:420px;overflow-y:auto;">
+          <div class="text-center text-muted py-4 small">
+            <i class="bi bi-shield-check fs-2 text-success d-block mb-2"></i>No alerts yet
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>.blink-badge{animation:blink 1.2s step-end infinite}@keyframes blink{50%{opacity:0}}</style>
+<script>
+function pollSecurityLogs() {
+  fetch('/api/v1/security/logs')
+    .then(r => r.json())
+    .then(logs => {
+      const list = document.getElementById('alertList');
+      if (!logs.length) return;
+      list.innerHTML = logs.slice(0, 20).map(l => `
+        <div class="p-3 border-bottom">
+          <div class="d-flex justify-content-between align-items-start">
+            <span class="badge bg-danger">${l.event_type.replace('_',' ')}</span>
+            <small class="text-muted">${l.timestamp.substring(11,16)}</small>
+          </div>
+          <div class="small text-muted mt-1">${l.location || 'Unknown location'}</div>
+          ${l.alert_sent ? '<span class="badge bg-success mt-1">Alert sent</span>' : ''}
+        </div>`).join('');
+    });
+}
+setInterval(pollSecurityLogs, 8000);
+pollSecurityLogs();
+</script>
+{% endblock %}

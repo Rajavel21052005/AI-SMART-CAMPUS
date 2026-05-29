@@ -1,0 +1,218 @@
+{% extends "shared/base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Campus Analytics{% endblock %}
+
+{% block sidebar_links %}
+<li><a href="{{ url_for('faculty.dashboard') }}" class="nav-link sidebar-link"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+<li><a href="{{ url_for('analytics.dashboard') }}" class="nav-link sidebar-link active"><i class="bi bi-graph-up me-2"></i>Analytics</a></li>
+<li><a href="{{ url_for('faculty.defaulters') }}" class="nav-link sidebar-link"><i class="bi bi-exclamation-triangle me-2"></i>Defaulters</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- ── KPI Row ─────────────────────────────────────────── -->
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-shield-check-fill fs-2 text-success mb-1"></i>
+      <div class="fw-bold fs-2 text-success">{{ risk_counts.Safe }}</div>
+      <div class="text-muted small">Safe Students</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-exclamation-circle-fill fs-2 text-warning mb-1"></i>
+      <div class="fw-bold fs-2 text-warning">{{ risk_counts.Moderate }}</div>
+      <div class="text-muted small">Moderate Risk</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-x-circle-fill fs-2 text-danger mb-1"></i>
+      <div class="fw-bold fs-2 text-danger">{{ risk_counts.High }}</div>
+      <div class="text-muted small">High Risk</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card card text-center p-3">
+      <i class="bi bi-people-fill fs-2 text-primary mb-1"></i>
+      <div class="fw-bold fs-2 text-primary">{{ risk_counts.Safe + risk_counts.Moderate + risk_counts.High }}</div>
+      <div class="text-muted small">Total Predictions</div>
+    </div>
+  </div>
+
+  <!-- ── 14-day attendance trend ────────────────────────── -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-graph-up me-2 text-primary"></i>14-Day Attendance Trend</h6>
+        <a href="{{ url_for('analytics.export_attendance_pdf', subject_id=1) }}"
+           class="btn btn-xs btn-outline-danger">
+          <i class="bi bi-file-pdf me-1"></i>Export PDF
+        </a>
+      </div>
+      <div class="card-body"><canvas id="trendChart" height="220"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Risk distribution donut ────────────────────────── -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-pie-chart-fill me-2 text-warning"></i>Risk Distribution</h6>
+      </div>
+      <div class="card-body d-flex flex-column align-items-center">
+        <canvas id="riskDonut" width="220" height="220"></canvas>
+        <div class="mt-3 w-100">
+          {% for label, color in [('Safe','success'),('Moderate','warning'),('High','danger')] %}
+          <div class="d-flex justify-content-between small mb-1">
+            <span><span class="badge bg-{{ color }} me-1"> </span>{{ label }}</span>
+            <span class="fw-bold">{{ risk_counts[label] }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Department attendance bar ──────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-building me-2 text-info"></i>Department Attendance Average</h6>
+      </div>
+      <div class="card-body"><canvas id="deptChart" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Subject performance ────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-book-fill me-2 text-success"></i>Subject Attendance %</h6>
+      </div>
+      <div class="card-body"><canvas id="subjChart" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Bottom defaulters ──────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-arrow-down-circle-fill me-2 text-danger"></i>Lowest Attendance Students</h6>
+        <a href="{{ url_for('analytics.export_students_excel') }}"
+           class="btn btn-xs btn-outline-success"><i class="bi bi-file-earmark-excel"></i> Export</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-dark"><tr><th>Name</th><th>Reg</th><th class="text-center">Attendance</th></tr></thead>
+          <tbody>
+            {% for d in defaulters %}
+            <tr>
+              <td class="fw-semibold small">{{ d.student.name }}</td>
+              <td><code class="x-small">{{ d.student.reg_number }}</code></td>
+              <td class="text-center">
+                <span class="badge {{ 'bg-danger' if d.pct < 60 else 'bg-warning text-dark' }}">
+                  {{ d.pct }}%
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Export buttons ─────────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header"><h6 class="mb-0 fw-semibold"><i class="bi bi-download me-2"></i>Export Reports</h6></div>
+      <div class="card-body d-grid gap-2">
+        <a href="{{ url_for('analytics.export_risk_pdf') }}" class="btn btn-outline-danger">
+          <i class="bi bi-file-pdf me-2"></i>Risk Report (PDF)
+        </a>
+        <a href="{{ url_for('analytics.export_students_excel') }}" class="btn btn-outline-success">
+          <i class="bi bi-file-earmark-excel me-2"></i>Student List (Excel)
+        </a>
+        <a href="{{ url_for('analytics.export_attendance_pdf', subject_id=1) }}" class="btn btn-outline-primary">
+          <i class="bi bi-file-earmark-pdf me-2"></i>Attendance Report (PDF)
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── 14-day trend chart ───────────────────────────────────────
+const trendLabels  = {{ trend | map(attribute='date')    | list | tojson }};
+const trendPresent = {{ trend | map(attribute='present') | list | tojson }};
+const trendAbsent  = {{ trend | map(attribute='absent')  | list | tojson  if trend[0] is defined else '[]' }};
+
+new Chart(document.getElementById('trendChart'), {
+  type: 'bar',
+  data: {
+    labels: trendLabels,
+    datasets: [
+      { label: 'Present', data: trendPresent, backgroundColor: '#16A34A', borderRadius: 4, stack: 'a' },
+      { label: 'Absent',  data: trendAbsent,  backgroundColor: '#DC2626', borderRadius: 4, stack: 'a' },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+  }
+});
+
+// ── Risk donut ───────────────────────────────────────────────
+new Chart(document.getElementById('riskDonut'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Safe', 'Moderate', 'High'],
+    datasets: [{
+      data: [{{ risk_counts.Safe }}, {{ risk_counts.Moderate }}, {{ risk_counts.High }}],
+      backgroundColor: ['#16A34A', '#D97706', '#DC2626'],
+      borderWidth: 2, hoverOffset: 6,
+    }]
+  },
+  options: { responsive: false, plugins: { legend: { display: false } } }
+});
+
+// ── Department chart ─────────────────────────────────────────
+const deptLabels = {{ dept_stats | map(attribute='name')    | list | tojson }};
+const deptPcts   = {{ dept_stats | map(attribute='avg_pct') | list | tojson }};
+new Chart(document.getElementById('deptChart'), {
+  type: 'bar',
+  data: {
+    labels: deptLabels,
+    datasets: [{ label: 'Avg Attendance %', data: deptPcts,
+      backgroundColor: '#2563EB', borderRadius: 6 }]
+  },
+  options: {
+    responsive: true, plugins: { legend: { display: false } },
+    scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+  }
+});
+
+// ── Subject chart ────────────────────────────────────────────
+const subjLabels = {{ subj_stats | map(attribute='name') | list | tojson }};
+const subjPcts   = {{ subj_stats | map(attribute='pct')  | list | tojson }};
+new Chart(document.getElementById('subjChart'), {
+  type: 'bar',
+  data: {
+    labels: subjLabels,
+    datasets: [{ label: 'Attendance %', data: subjPcts,
+      backgroundColor: subjPcts.map(p => p < 75 ? '#DC2626' : '#16A34A'),
+      borderRadius: 6 }]
+  },
+  options: {
+    responsive: true, indexAxis: 'y', plugins: { legend: { display: false } },
+    scales: { x: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+  }
+});
+</script>
+{% endblock %}
