@@ -3,7 +3,7 @@
 # Multi-stage: builder installs deps, final is lean runtime
 # ============================================================
 
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim AS builder
 
 # Install OS-level build dependencies for OpenCV + dlib
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,7 +17,7 @@ RUN pip install --upgrade pip && \
     pip install --prefix=/install --no-cache-dir -r requirements.txt
 
 # ── Runtime stage ──────────────────────────────────────────
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 libxext6 libxrender-dev libglib2.0-0 libopencv-dev \
