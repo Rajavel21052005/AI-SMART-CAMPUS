@@ -64,3 +64,10 @@ venv/
 __pycache__/
 ssh-add
 ssh-add.pub
+
+venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+*.h5
+.deepface/
